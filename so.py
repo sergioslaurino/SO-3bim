@@ -10,7 +10,7 @@ class FURGfs2:
         self.inicio_fat = self.tamanho_cabecalho  # FAT começa logo após o cabeçalho
         self.tamanho_maximo_nome = 50  # Tamanho máximo do nome de arquivos
         self.inicio_diretorio = self.inicio_fat + (self.tamanho // self.tamanho_bloco) * 4  # FAT com 4 bytes por entrada
-        self.inicio_dados = self.inicio_diretorio + (self.tamanho // self.tamanho_bloco) * 64  # Diretório raiz
+        self.inicio_dados = self.inicio_diretorio + (self.tamanho // self.tamanho_bloco) * 65  # Diretório com 65 bytes por entrada
         self.inicializar_sistema_arquivo()
 
     def inicializar_sistema_arquivo(self):
@@ -144,10 +144,10 @@ class FURGfs2:
         with open(self.caminho, "r+b") as arquivo:
             arquivo.seek(self.inicio_diretorio)
             for _ in range(self.tamanho // self.tamanho_bloco):
-                entrada = arquivo.read(64)
+                entrada = arquivo.read(65)  # Lê a entrada agora com 65 bytes
                 nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
                 if nome == nome_atual:
-                    arquivo.seek(-64, os.SEEK_CUR)
+                    arquivo.seek(-65, os.SEEK_CUR)
                     arquivo.write(novo_nome.ljust(self.tamanho_maximo_nome, '\x00').encode("utf-8"))
                     return
             raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
@@ -159,7 +159,7 @@ class FURGfs2:
             
             # Percorre o diretório em busca do arquivo
             for _ in range(self.tamanho // self.tamanho_bloco):
-                entrada = arquivo.read(64)
+                entrada = arquivo.read(65)  # Agora lemos 65 bytes por entrada no diretório
                 nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
                 if nome == nome_arquivo:
                     # Obtém o tamanho e o primeiro bloco a partir da entrada
@@ -186,11 +186,11 @@ class FURGfs2:
                     # Limpa a entrada do arquivo no diretório (marca como vazio)
                     arquivo.seek(self.inicio_diretorio)
                     for i in range(self.tamanho // self.tamanho_bloco):
-                        entrada = arquivo.read(64)
+                        entrada = arquivo.read(65)  # Lê 65 bytes por entrada
                         nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
                         if nome == nome_arquivo:
-                            arquivo.seek(self.inicio_diretorio + i * 64)
-                            arquivo.write(b'\x00' * 64)  # Limpa a entrada
+                            arquivo.seek(self.inicio_diretorio + i * 65)  # Atualiza a posição correta
+                            arquivo.write(b'\x00' * 65)  # Limpa a entrada
                             break
 
                     print(f"Arquivo '{nome_arquivo}' removido e espaço liberado com sucesso!")
@@ -199,17 +199,18 @@ class FURGfs2:
             raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
 
 
+
     def proteger_arquivo(self, nome_arquivo, proteger=True):
         """Protege ou desprotege um arquivo contra remoção/escrita."""
         with open(self.caminho, "r+b") as arquivo:
             arquivo.seek(self.inicio_diretorio)
             for _ in range(self.tamanho // self.tamanho_bloco):
-                entrada = arquivo.read(64)
+                entrada = arquivo.read(65)  # Lê a entrada agora com 65 bytes
                 nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
                 if nome == nome_arquivo:
-                    arquivo.seek(-64, os.SEEK_CUR)
+                    arquivo.seek(-65, os.SEEK_CUR)
                     protecao = 1 if proteger else 0
-                    arquivo.write(struct.pack("B", protecao))
+                    arquivo.write(struct.pack("B", protecao))  # Escreve 1 byte de proteção
                     return
             raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
 
