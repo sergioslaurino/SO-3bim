@@ -155,57 +155,18 @@ class FURGfs2:
             raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
         
     def remover_arquivo(self, nome_arquivo):
-        """Remove um arquivo armazenado no FURGfs2 e libera o espaço ocupado na FAT."""
-        with open(self.caminho, "r+b") as arquivo:
-            arquivo.seek(self.inicio_diretorio)
-            
-            # Percorre o diretório em busca do arquivo
-            for _ in range(self.tamanho // self.tamanho_bloco):
-                entrada = arquivo.read(64)
-                nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
-                if nome == nome_arquivo:
-                    # Obtém o tamanho e o primeiro bloco a partir da entrada
-                    tamanho_arquivo, primeiro_bloco = struct.unpack("II", entrada[self.tamanho_maximo_nome:self.tamanho_maximo_nome + 8])
-                    
-                    # Calcula o número de blocos necessários para armazenar o arquivo
-                    blocos_necessarios = (tamanho_arquivo + self.tamanho_bloco - 1) // self.tamanho_bloco
-
-                    # Agora, vamos liberar esses blocos
-                    arquivo.seek(self.inicio_fat)
-                    bloco_atual = primeiro_bloco
-                    for _ in range(blocos_necessarios):
-                        if bloco_atual == -1:
-                            break
-                        
-                        # Marca o bloco atual como livre (0) na FAT
-                        arquivo.seek(self.inicio_fat + bloco_atual * 4)
-                        arquivo.write(struct.pack("I", 0))  # Marca como livre
-
-                        # Vai para o próximo bloco na FAT
-                        arquivo.seek(self.inicio_fat + bloco_atual * 4)
-                        bloco_atual = struct.unpack("I", arquivo.read(4))[0]
-
-                    # Limpa a entrada do arquivo no diretório (marca como vazio)
-                    arquivo.seek(self.inicio_diretorio)
-                    for i in range(self.tamanho // self.tamanho_bloco):
-                        entrada = arquivo.read(64)
-                        nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
-                        if nome == nome_arquivo:
-                            arquivo.seek(self.inicio_diretorio + i * 64)
-                            arquivo.write(b'\x00' * 64)  # Limpa a entrada
-                            break
-
-                    # Atualiza a FAT no disco após a liberação
-                    arquivo.seek(self.inicio_fat)
-                    for entrada_fat in fat:
-                        arquivo.write(struct.pack("I", entrada_fat))
-
-                    print(f"Arquivo '{nome_arquivo}' removido e espaço liberado com sucesso!")
-                    return
-            
-            raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
-
-
+            """Remove um arquivo armazenado no FURGfs2."""
+            with open(self.caminho, "r+b") as arquivo:
+                arquivo.seek(self.inicio_diretorio)
+                for _ in range(self.tamanho // self.tamanho_bloco):
+                    entrada = arquivo.read(64)
+                    nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
+                    if nome == nome_arquivo:
+                        # Marca como removido
+                        arquivo.seek(-64, os.SEEK_CUR)
+                        arquivo.write(b'\x00' * 64)
+                        return
+                raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
 
     def proteger_arquivo(self, nome_arquivo, proteger=True):
         """Protege ou desprotege um arquivo contra remoção/escrita."""
