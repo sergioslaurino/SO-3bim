@@ -157,39 +157,37 @@ class FURGfs2:
         with open(self.caminho, "r+b") as arquivo:
             arquivo.seek(self.inicio_diretorio)
             
-            # Percorre o diretório em busca do arquivo
             for _ in range(self.tamanho // self.tamanho_bloco):
-                entrada = arquivo.read(65)  # Agora lemos 65 bytes por entrada no diretório
+                entrada = arquivo.read(65)
                 nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
                 if nome == nome_arquivo:
-                    # Obtém o tamanho e o primeiro bloco a partir da entrada
-                    tamanho_arquivo, primeiro_bloco = struct.unpack("II", entrada[self.tamanho_maximo_nome:self.tamanho_maximo_nome + 8])
+                    # Verifica a flag de proteção
+                    protecao = entrada[64]
+                    if protecao == 1:
+                        raise PermissionError(f"O arquivo '{nome_arquivo}' está protegido e não pode ser removido.")
                     
-                    # Calcula o número de blocos necessários para armazenar o arquivo
+                    # Obtém o tamanho e o primeiro bloco
+                    tamanho_arquivo, primeiro_bloco = struct.unpack("II", entrada[self.tamanho_maximo_nome:self.tamanho_maximo_nome + 8])
                     blocos_necessarios = (tamanho_arquivo + self.tamanho_bloco - 1) // self.tamanho_bloco
 
-                    # Agora, vamos liberar esses blocos
+                    # Libera os blocos na FAT
                     arquivo.seek(self.inicio_fat)
                     bloco_atual = primeiro_bloco
                     for _ in range(blocos_necessarios):
                         if bloco_atual == -1:
                             break
-                        
-                        # Marca o bloco atual como livre (0) na FAT
                         arquivo.seek(self.inicio_fat + bloco_atual * 4)
                         arquivo.write(struct.pack("I", 0))  # Marca como livre
-
-                        # Vai para o próximo bloco na FAT
                         arquivo.seek(self.inicio_fat + bloco_atual * 4)
                         bloco_atual = struct.unpack("I", arquivo.read(4))[0]
 
-                    # Limpa a entrada do arquivo no diretório (marca como vazio)
+                    # Limpa a entrada do arquivo no diretório
                     arquivo.seek(self.inicio_diretorio)
                     for i in range(self.tamanho // self.tamanho_bloco):
-                        entrada = arquivo.read(65)  # Lê 65 bytes por entrada
+                        entrada = arquivo.read(65)
                         nome = entrada[:self.tamanho_maximo_nome].decode("utf-8").strip('\x00')
                         if nome == nome_arquivo:
-                            arquivo.seek(self.inicio_diretorio + i * 65)  # Atualiza a posição correta
+                            arquivo.seek(self.inicio_diretorio + i * 65)
                             arquivo.write(b'\x00' * 65)  # Limpa a entrada
                             break
 
@@ -197,6 +195,7 @@ class FURGfs2:
                     return
             
             raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
+
 
 
 
@@ -210,9 +209,12 @@ class FURGfs2:
                 if nome == nome_arquivo:
                     arquivo.seek(-65, os.SEEK_CUR)
                     protecao = 1 if proteger else 0
-                    arquivo.write(struct.pack("B", protecao))  # Escreve 1 byte de proteção
+                    # Atualiza o byte de proteção (exemplo: byte 64, último da entrada)
+                    arquivo.seek(64, os.SEEK_CUR)  # Vai para o byte de proteção
+                    arquivo.write(struct.pack("B", protecao))  # Escreve a proteção
                     return
             raise FileNotFoundError("Arquivo não encontrado no FURGfs2.")
+
 
 def main():
     print("Bem-vindo ao FURGfs2!")
